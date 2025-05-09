@@ -1,0 +1,47 @@
+div.title p {
+  margin: 0;
+}
+
+.medialist.table .random-entry {
+  background: rgb(var(--color-blue));
+  color: rgb(var(--color-text-bright));
+}
+
+.random-button-container {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+
+  width: 60px;
+  height: 60px;
+
+  margin: 40px 65px;
+
+  padding: 12px;
+
+  background: rgb(var(--color-blue));
+  border-radius: 50%;
+
+  cursor: pointer;
+
+  transition: filter 0.2s;
+}
+
+.random-button {
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
+
+  border-style: none;
+
+  cursor: pointer;
+}
+
+.random-button-container:hover {
+  filter: brightness(1.1);
+}
+
+.random-button-container:active {
+  filter: brightness(0.9);
+}

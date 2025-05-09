@@ -1,0 +1,20 @@
+{
+  "name": "anidub",
+  "version": "1.0.0",
+  "description": "Adds dub status for shows on https://anilist.co",
+  "main": "index.js",
+  "author": "Jonesbryan",
+  "license": "ISC",
+  "scripts": {
+    "clean": "rimraf dist",
+    "compile": "tsc",
+    "copy": "cpy manifest.json dist && cpy icons/*.png dist/icons && cpy src/public dist",
+    "build": "npm run clean && tsc && npm run copy"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "cpy-cli": "^5.0.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.2"
+  }
+}
