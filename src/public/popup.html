@@ -1,61 +1,88 @@
-<!-- Popup for adding your anilist token -->
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-  </head>
-  <body>
+    <title>Anilist Token</title>
     <style>
+      * {
+        box-sizing: border-box;
+      }
+
       body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f9fafb;
+        width: 300px;
+      }
+
+      .container {
         padding: 20px;
-        background-color: #f4f4f4;
       }
 
       h1 {
-        color: #333;
-      }
-
-      form {
-        display: flex;
-        flex-direction: column;
+        font-size: 18px;
+        color: #111827;
+        margin-bottom: 16px;
       }
 
       label {
-        margin-bottom: 10px;
+        font-size: 14px;
+        color: #374151;
+        margin-bottom: 6px;
+        display: block;
       }
 
       input[type="text"] {
-        padding: 8px;
-        margin-bottom: 10px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
       }
 
       button {
+        width: 100%;
         padding: 10px;
-        background-color: #28a745;
+        font-size: 14px;
+        background-color: #3b82f6;
         color: white;
         border: none;
-        border-radius: 4px;
+        border-radius: 6px;
         cursor: pointer;
+        transition: background-color 0.2s ease;
       }
 
       button:hover {
-        background-color: #218838;
+        background-color: #2563eb;
+      }
+
+      .footer {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #6b7280;
+        text-align: center;
       }
     </style>
-
-    <h1>Enter your Anilist Token</h1>
-    <form id="tokenForm">
-      <label for="token">Token:</label>
-      <input type="text" id="token" name="token" required />
-      <button type="submit">Save</button>
-    </form>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Anilist Token</h1>
+      <form id="tokenForm">
+        <label for="token">Enter your token:</label>
+        <input
+          type="text"
+          id="token"
+          name="token"
+          placeholder="Paste token here..."
+          required
+        />
+        <button type="submit">Save Token</button>
+      </form>
+      <div class="footer">This is stored locally in your browser.</div>
+    </div>
 
     <script src="popup.js"></script>
   </body>
