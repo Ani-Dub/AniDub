@@ -1,363 +1,226 @@
-const rootElement = document.querySelector('div.page-content');
-
-let sidebarInfoAdded = false;
-
-type StatusString = 'finished' | 'no dub' | 'releasing' | 'error' | 'not found';
-
-interface Status {
-  status: string;
-  nextAir: Date | null;
-  episodes: number | null;
-  totalEpisodes: number | null;
+interface ListResponse {
+  allDubs: DubStatus[];
+  accessToken: string;
 }
 
-if (/user\/.+\//.test(window.location.pathname)) {
-  addNavbarListener();
-
-  if (/user\/.+\/animelist/.test(window.location.pathname)) {
-    // addDubStatuses();
-    addRandomizer();
-  }
+interface DubStatus {
+  anilistId: number;
+  hasDub: boolean;
+  isReleasing: boolean;
+  dubbedEpisodes: number;
+  totalEpisodes: number;
+  nextAir: string | null;
 }
 
-if (/anime\/\d+\/.+/.test(window.location.pathname)) addSidebarListener();
+const API_URL = "http://localhost:3000/list";
 
-const pageObserver = new MutationObserver((mutationsList) => {
-  if (/user\/.+\//.test(window.location.pathname)) addNavbarListener();
-  if (/anime\/\d+\/.+/.test(window.location.pathname)) addSidebarListener();
-});
-
-if (!rootElement) throw new Error('Could not find root element!');
-
-pageObserver.observe(rootElement, {
-  childList: true,
-});
-
-function addRandomizer() {
-  const section = [...document.querySelectorAll('h3.section-name')].find(
-    (x) => x.textContent === 'Planning'
-  );
-
-  if (!section) {
-    console.log('Could not find planning section!');
-    setTimeout(addRandomizer, 1000);
-    return;
-  }
-
-  const itemList =
-    section.nextElementSibling?.querySelector('div.list-entries');
-
-  if (!itemList) {
-    console.log('Could not find list entries!');
-    setTimeout(addRandomizer, 1000);
-    return;
-  }
-
-  const randomButtonContainer = document.createElement('div');
-
-  randomButtonContainer.classList.add('random-button-container');
-
-  const randomButton = document.createElement('button');
-
-  randomButtonContainer.appendChild(randomButton);
-
-  randomButton.classList.add('random-button');
-
-  randomButton.style.background = `url("${chrome.runtime.getURL(
-    'src/public/shuffle.svg'
-  )}")`;
-
-  document.body.appendChild(randomButtonContainer);
-
-  randomButton.onclick = () => {
-    selectRandomItem(itemList);
-  };
-}
-
-function selectRandomItem(itemList: Element) {
-  const items = itemList.querySelectorAll('div.entry.row');
-
-  const randomItem = items[Math.floor(Math.random() * items.length)];
-
-  if (randomItem.children[2].textContent !== '✅')
-    return selectRandomItem(itemList);
-
-  randomItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-  randomItem.classList.add('random-entry');
-
-  setTimeout(() => {
-    randomItem.classList.remove('random-entry');
-  }, 1250);
-}
-
-function addNavbarListener() {
-  const navbar = document.querySelector('div.nav.container');
-
-  if (!navbar) throw new Error('Could not find navbar!');
-
-  const navbarObserver = new MutationObserver((mutationsList) => {
-    const activeSection = navbar.querySelector('a.router-link-active');
-
-    if (!activeSection) throw new Error('Could not find active section!');
-
-    if (activeSection.textContent?.trim() !== 'Anime List') return;
-
-    addDubStatuses();
-  });
-
-  navbarObserver.observe(navbar, {
-    attributes: true,
-    subtree: true,
-  });
-}
-
-/**
- * Adds dub statuses to the anime list page.
- */
-async function addDubStatuses() {
-  console.log('Adding dub statuses...');
-  const sections = document.querySelectorAll('div.list-section');
-
-  // wait for div.lists to load
-  if (sections.length === 0) {
-    console.log('Waiting for lists to load...');
-    setTimeout(addDubStatuses, 1000);
-    return;
-  }
-
-  for (const section of sections) {
-    addSectionHeader(section);
-
-    const items = section.querySelectorAll('div.entry.row');
-
-    for (const item of items) addItemStatus(item);
-
-    addSectionObserver(section);
-  }
-}
-
-/**
- * Adds a MutationObserver to a section element to detect
- * when new items are added to the list.
- */
-function addSectionObserver(section: Element) {
-  const entriesNode = section.querySelector('div.list-entries');
-
-  if (!entriesNode) {
-    console.error('Could not find entries node for section:', section);
-
-    return;
-  }
-
-  const sectionObserver = new MutationObserver(async (mutationsList) => {
-    for (const mutation of mutationsList) {
-      if (mutation.type === 'childList') {
-        const newItems = Array.from(mutation.addedNodes).filter(
-          (node) => node instanceof Element
-        );
-
-        for (const item of newItems) addItemStatus(item);
+// Utilities
+const waitForElement = (selector: string): Promise<HTMLElement> =>
+  new Promise((resolve) => {
+    const interval = setInterval(() => {
+      const element = document.querySelector(selector);
+      if (element) {
+        clearInterval(interval);
+        resolve(element as HTMLElement);
       }
+    }, 100);
+  });
+
+const formatDateCountdown = (date: Date): string => {
+  const diff = date.getTime() - Date.now();
+  if (diff <= 0) return "Now";
+
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+
+  return `${days ? `${days}d ` : ""}${hours ? `${hours}h ` : ""}${
+    minutes ? `${minutes}m` : ""
+  }`.trim();
+};
+
+const fetchDubStatus = async (ids: string[]): Promise<ListResponse | null> => {
+  const { anilistToken } = await chrome.storage.local.get("anilistToken");
+  if (!anilistToken) {
+    console.error("Anilist token not found in local storage");
+    return null;
+  }
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: anilistToken,
+      },
+      body: JSON.stringify({ items: ids }),
+    });
+
+    const data: ListResponse = await res.json();
+    chrome.storage.local.set({ anilistToken: data.accessToken });
+    return data;
+  } catch (error) {
+    console.error("Failed to fetch dub status:", error);
+    return null;
+  }
+};
+
+const createElementWithClasses = (
+  tag: string,
+  classList: string[],
+  textContent?: string
+): HTMLElement => {
+  const el = document.createElement(tag);
+  el.classList.add(...classList);
+  if (textContent) el.textContent = textContent;
+  return el;
+};
+
+// Anime Detail Page
+const handleAnimePage = async () => {
+  const id = window.location.pathname.split("/")[2];
+  const sidebar = await waitForElement("div.sidebar > div.data");
+  const statusIndex = [...sidebar.children].findIndex(
+    (child) =>
+      child.children.length === 2 && child.children[0].textContent === "Status"
+  );
+
+  if (statusIndex === -1) {
+    console.error("Sidebar status index not found");
+    return;
+  }
+
+  const data = await fetchDubStatus([id]);
+  if (!data || !data.allDubs.length) return;
+
+  const dub = data.allDubs[0];
+  const dataAttr = sidebar.children[statusIndex].attributes[0];
+  const wrapper = createElementWithClasses("div", [
+    "data-set",
+    "airing-countdown",
+  ]);
+  const label = createElementWithClasses("div", ["type"], "Dub Status");
+  const value = createElementWithClasses("div", ["value"]);
+
+  wrapper.setAttribute(dataAttr.name, dataAttr.value);
+  label.setAttribute(dataAttr.name, dataAttr.value);
+  value.setAttribute(dataAttr.name, dataAttr.value);
+
+  if (!dub.hasDub) value.textContent = "Not available";
+  else if (dub.isReleasing && dub.nextAir) {
+    const nextAirDate = new Date(dub.nextAir);
+    value.textContent = `Ep ${dub.dubbedEpisodes + 1}: ${formatDateCountdown(
+      nextAirDate
+    )}`;
+  } else value.textContent = "Finished";
+
+  wrapper.append(label, value);
+  sidebar.insertBefore(wrapper, sidebar.children[statusIndex + 1]);
+};
+
+// Anime List Page
+const handleAnimelistPage = async () => {
+  const listContainer = await waitForElement("div.medialist.table div.lists");
+  const planningList = [...listContainer.children].find(
+    (list) => list.children[0].textContent === "Planning"
+  ) as HTMLElement | undefined;
+
+  if (!planningList) {
+    console.error("Planning list not found");
+    return;
+  }
+
+  const headerRow = planningList.children[1].children[0];
+  const headers = headerRow.children;
+  const dubHeader = createElementWithClasses(
+    "div",
+    ["dub-status"],
+    "Dub Status"
+  );
+  headerRow.insertBefore(dubHeader, headers[2]);
+
+  await addDubStatusToAnimeList(planningList);
+
+  let currentLength = planningList.querySelectorAll("div.entry.row").length;
+  const observer = new MutationObserver(async () => {
+    const newLength = planningList.querySelectorAll("div.entry.row").length;
+    if (newLength !== currentLength) {
+      currentLength = newLength;
+      await addDubStatusToAnimeList(planningList);
     }
   });
 
-  sectionObserver.observe(entriesNode, {
-    childList: true,
-  });
-}
+  observer.observe(planningList, { childList: true, subtree: true });
+};
 
-/**
- * Adds a 'Dubbed' section header to the given section element.
- */
-function addSectionHeader(section: Element) {
-  const header = section.querySelector('div.list-head.row');
+const addDubStatusToAnimeList = async (list: HTMLElement) => {
+  const items = [...list.querySelectorAll("div.entry.row")];
+  const ids = items
+    .filter((item) => !item.querySelector("div.dub-status"))
+    .map(
+      (item) =>
+        item.children[1]?.children[0]?.getAttribute("href")?.split("/")[2]
+    )
+    .filter(Boolean) as string[];
 
-  if (!header) {
-    console.error('Could not find header for section:', section);
+  if (!ids.length) return;
 
-    return;
-  }
+  const data = await fetchDubStatus(ids);
+  if (!data) return;
 
-  const dubbed = document.createElement('div');
+  for (const item of items) {
+    const title = item.children[1];
+    const id = title.children[0]?.getAttribute("href")?.split("/")[2];
+    if (!id || item.querySelector("div.dub-status")) continue;
 
-  dubbed.classList.add('dubbed');
+    const dub = data.allDubs.find((d) => d.anilistId === parseInt(id)) ?? {
+      anilistId: parseInt(id),
+      hasDub: false,
+      isReleasing: false,
+      dubbedEpisodes: 0,
+      totalEpisodes: 0,
+      nextAir: null,
+    };
 
-  dubbed.textContent = 'Dubbed';
-
-  header.insertBefore(dubbed, header.children[2]);
-}
-
-/**
- * Adds a '✅' status to the given item element.
- */
-async function addItemStatus(item: Element) {
-  const titleNode = item.children[1];
-  const titleLink = titleNode.children[0];
-
-  if (item.children[2].classList.contains('dubbed')) return;
-
-  const id = titleLink.getAttribute('href')?.match(/\/anime\/(\d+)\//)?.[1];
-
-  const container = document.createElement('div');
-
-  container.classList.add('dubbed');
-
-  const response = await fetch(
-    `https://anidub.diskstation.local/check?name=${titleLink.textContent}&id=${id}`
-  );
-
-  const status: Status = await response.json();
-
-  switch (status.status) {
-    case 'finished':
-      container.textContent = '✅';
-      container.title = `Finished airing with ${status.totalEpisodes} episodes.`;
-      break;
-    case 'no dub':
-      container.textContent = '❌';
-      container.title = 'No dub available.';
-      break;
-    case 'releasing':
-      container.textContent = `${status.episodes}/${status.totalEpisodes}`;
-      container.title = `Currently airing. Next episode airs on ${status.nextAir}.`;
-      break;
-    case 'error':
-      container.textContent = '❓';
-      container.title = 'Error checking dub status.';
-      break;
-    case 'not found':
-      container.textContent = '❔';
-      container.title = 'Anime not found.';
-      break;
-    default:
-      container.textContent = '❔';
-      container.title = 'Unknown status.';
-  }
-
-  item.insertBefore(container, item.children[2]);
-}
-
-function addSidebarListener() {
-  console.log('Adding sidebar listener...');
-
-  sidebarInfoAdded = false;
-
-  const contentNode = document.querySelector('div.page-content');
-
-  if (!contentNode) throw new Error('Could not find content node!');
-
-  const sidebarObserver = new MutationObserver((mutationsList) => {
-    if (!/anime\/\d+\/.+/.test(window.location.pathname)) return;
-
-    const sidebar = document.querySelector('div.sidebar');
-
-    if (!sidebar || sidebarInfoAdded) {
-      console.log('Sidebar not found or info already added!', sidebarInfoAdded);
-      return;
+    const statusEl = createElementWithClasses("div", ["dub-status"]);
+    if (!dub.hasDub) {
+      statusEl.textContent = "No Dub";
+      statusEl.classList.add("no-dub");
+    } else if (dub.isReleasing && dub.nextAir) {
+      statusEl.textContent = `Ep ${
+        dub.dubbedEpisodes + 1
+      }: ${formatDateCountdown(new Date(dub.nextAir))}`;
+      statusEl.classList.add("airing");
+    } else {
+      statusEl.textContent = "Finished";
+      statusEl.classList.add("finished");
     }
 
-    addDubStatus();
-  });
-
-  sidebarObserver.observe(contentNode, {
-    childList: true,
-    subtree: true,
-  });
-}
-
-async function addDubStatus() {
-  if (sidebarInfoAdded) {
-    console.log('Sidebar info already added!');
-    return;
+    title.insertAdjacentElement("afterend", statusEl);
   }
+};
 
-  console.log('Adding dub status to sidebar...');
+// Page Change Watcher
+let currentPage: string | null = null;
 
-  const sidebarItems = document.querySelectorAll(
-    'div.sidebar div.data div.data-set'
-  );
+const processPageChange = () => {
+  const newPage = window.location.pathname;
+  if (newPage === currentPage) return;
 
-  const statusItem = [...sidebarItems].find(
-    (item) => item.querySelector('.type')?.textContent === 'Status'
-  );
+  currentPage = newPage;
+  console.log("Page changed to:", currentPage);
 
-  if (!statusItem) {
-    console.log('Could not find status item!');
-    return;
-  }
+  if (/user\/.+\/animelist/.test(newPage)) handleAnimelistPage();
+  else if (/anime\/.+\/.+/.test(newPage)) handleAnimePage();
+};
 
-  sidebarInfoAdded = true;
+// Bootstrapping
+(async () => {
+  const root = await waitForElement("div.page-content");
+  console.log("Anilist page content loaded");
 
-  const statusContainer = document.createElement('div');
-  statusContainer.classList.add('data-set', 'dub-status');
+  processPageChange();
 
-  const statusHeader = document.createElement('div');
-  statusHeader.classList.add('type');
-  statusHeader.textContent = 'Dub Status';
-
-  const header = document.querySelector('div.header');
-
-  const title = header?.children[0].children[1].children[0].textContent?.trim();
-
-  console.log('Searching for anime:', title);
-
-  const id = window.location.pathname.match(/\/anime\/(\d+)\//)?.[1];
-
-  const response = await fetch(
-    `https://anidub.diskstation.local/check?name=${title}&id=${id}`
-  );
-
-  const status: Status = await response.json();
-
-  const statusValue = document.createElement('div');
-  statusValue.classList.add('value');
-
-  switch (status.status) {
-    case 'finished':
-      statusValue.textContent = 'Finished';
-      break;
-    case 'no dub':
-      statusValue.textContent = 'No Dub';
-      break;
-    case 'releasing':
-      if (status.nextAir) {
-        const nextAir = new Date(status.nextAir);
-
-        const timeUntil = nextAir.getTime() - Date.now();
-
-        const days = Math.floor(timeUntil / (1000 * 60 * 60 * 24));
-        const hours = Math.floor(
-          (timeUntil % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-        );
-
-        const minutes = Math.floor(
-          (timeUntil % (1000 * 60 * 60)) / (1000 * 60)
-        );
-
-        let str = '';
-
-        if (days > 0) str += `${days}d `;
-        if (hours > 0) str += `${hours}h `;
-        if (minutes > 0) str += `${minutes}m`;
-
-        statusValue.textContent = `Ep ${status.episodes! + 1}: ${str}`;
-        statusContainer.classList.add('releasing');
-      } else
-        statusValue.textContent = `${status.episodes}/${status.totalEpisodes}`;
-      break;
-    case 'error':
-      statusValue.textContent = 'Error';
-      break;
-    case 'not found':
-      statusValue.textContent = 'Not Found';
-      break;
-    default:
-      statusValue.textContent = 'Unknown';
-  }
-
-  statusContainer.appendChild(statusHeader);
-  statusContainer.appendChild(statusValue);
-
-  statusItem.after(statusContainer);
-}
+  const observer = new MutationObserver(processPageChange);
+  observer.observe(root, { childList: true, attributes: true, subtree: true });
+})();

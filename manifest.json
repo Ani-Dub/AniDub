@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AniDub",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Adds dub status for shows on https://anilist.co",
   "icons": {
     "16": "icons/icon16.png",
@@ -9,40 +9,31 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "AniDub Settings",
+    "default_title": "AniDub",
+    "default_popup": "src/public/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
+  "permissions": ["storage"],
   "background": {},
   "content_scripts": [
     {
-      "matches": [
-        "https://anilist.co/*"
-      ],
-      "js": [
-        "src/main.js"
-      ],
-      "css": [
-        "src/public/anime.css",
-        "src/public/animelist.css"
-      ]
+      "matches": ["https://anilist.co/*"],
+      "js": ["src/main.js"],
+      "css": ["src/public/anime.css", "src/public/animelist.css"]
     }
   ],
   "host_permissions": [
-    "https://anidub.diskstation.local/*"
+    "https://anidub.diskstation.local/*",
+    "http://localhost:3000/*"
   ],
   "web_accessible_resources": [
     {
-      "resources": [
-        "icons/*.png",
-        "src/public/*"
-      ],
-      "matches": [
-        "https://anilist.co/*"
-      ]
+      "resources": ["icons/*.png", "src/public/*"],
+      "matches": ["https://anilist.co/*"]
     }
   ]
 }
