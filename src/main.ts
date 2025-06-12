@@ -12,9 +12,9 @@ interface DubStatus {
   nextAir: string | null;
 }
 
-const API_URL = "http://localhost:3000/list";
+const API_URL = "http://localhost:3000/dubs";
 
-// Utilities
+// Utility to wait for a DOM element to appear
 const waitForElement = (selector: string): Promise<HTMLElement> =>
   new Promise((resolve) => {
     const interval = setInterval(() => {
@@ -26,6 +26,7 @@ const waitForElement = (selector: string): Promise<HTMLElement> =>
     }, 100);
   });
 
+// Format a future date as a countdown string
 const formatDateCountdown = (date: Date): string => {
   const diff = date.getTime() - Date.now();
   if (diff <= 0) return "Now";
@@ -39,32 +40,7 @@ const formatDateCountdown = (date: Date): string => {
   }`.trim();
 };
 
-const fetchDubStatus = async (ids: string[]): Promise<ListResponse | null> => {
-  const { anilistToken } = await chrome.storage.local.get("anilistToken");
-  if (!anilistToken) {
-    console.error("Anilist token not found in local storage");
-    return null;
-  }
-
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: anilistToken,
-      },
-      body: JSON.stringify({ items: ids }),
-    });
-
-    const data: ListResponse = await res.json();
-    chrome.storage.local.set({ anilistToken: data.accessToken });
-    return data;
-  } catch (error) {
-    console.error("Failed to fetch dub status:", error);
-    return null;
-  }
-};
-
+// Create a DOM element with classes and optional text
 const createElementWithClasses = (
   tag: string,
   classList: string[],
@@ -76,7 +52,50 @@ const createElementWithClasses = (
   return el;
 };
 
-// Anime Detail Page
+// Cached dub list for anime list page
+let cachedDubList: ListResponse | null = null;
+
+// Fetch the full dub list (used for anime list page)
+const fetchDubList = async (): Promise<ListResponse | null> => {
+  let anilistToken: string | undefined;
+  try {
+    const result = await chrome.storage.local.get("anilistToken");
+    anilistToken = result.anilistToken;
+  } catch (err) {
+    alert(
+      "Failed to access extension storage. Please reload the page or extension."
+    );
+    console.error("chrome.storage.local.get failed:", err);
+    return null;
+  }
+  if (!anilistToken) {
+    alert("Anilist token not found in local storage. Please log in again.");
+    console.error("Anilist token not found in local storage");
+    return null;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/list`, {
+      method: "GET",
+      headers: {
+        Authorization: anilistToken,
+      },
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      console.error("Failed to fetch dub list:", err.error || res.statusText);
+      return null;
+    }
+    const data: ListResponse = await res.json();
+    chrome.storage.local.set({ anilistToken: data.accessToken });
+    return data;
+  } catch (error) {
+    console.error("Failed to fetch dub list:", error);
+    return null;
+  }
+};
+
+// Handle dub status display on anime detail page
 const handleAnimePage = async () => {
   const id = window.location.pathname.split("/")[2];
   const sidebar = await waitForElement("div.sidebar > div.data");
@@ -90,10 +109,55 @@ const handleAnimePage = async () => {
     return;
   }
 
-  const data = await fetchDubStatus([id]);
-  if (!data || !data.allDubs.length) return;
+  // Try to use cachedDubList if available
+  let dub: DubStatus | undefined;
+  if (cachedDubList) {
+    dub = cachedDubList.allDubs.find((d) => d.anilistId === parseInt(id));
+  }
 
-  const dub = data.allDubs[0];
+  // If not found in cache, fetch from API using /:id route
+  if (!dub) {
+    let anilistToken: string | undefined;
+    try {
+      const result = await chrome.storage.local.get("anilistToken");
+      anilistToken = result.anilistToken;
+    } catch (err) {
+      alert(
+        "Failed to access extension storage. Please reload the page or extension."
+      );
+      console.error("chrome.storage.local.get failed:", err);
+      return;
+    }
+    if (!anilistToken) {
+      alert("Anilist token not found in local storage. Please log in again.");
+      console.error("Anilist token not found in local storage");
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/${id}`, {
+        method: "GET",
+        headers: {
+          Authorization: anilistToken,
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error(
+          "Failed to fetch dub status for anime detail page:",
+          err.error || res.statusText
+        );
+        return;
+      }
+      const data: DubStatus = await res.json();
+      dub = data;
+    } catch (error) {
+      console.error("Failed to fetch dub status for anime detail page:", error);
+      return;
+    }
+  }
+
+  if (!dub) return;
+
   const dataAttr = sidebar.children[statusIndex].attributes[0];
   const wrapper = createElementWithClasses("div", [
     "data-set",
@@ -118,7 +182,7 @@ const handleAnimePage = async () => {
   sidebar.insertBefore(wrapper, sidebar.children[statusIndex + 1]);
 };
 
-// Anime List Page
+// Handle dub status display on anime list page
 const handleAnimelistPage = async () => {
   const listContainer = await waitForElement("div.medialist.table div.lists");
   const planningList = [...listContainer.children].find(
@@ -139,6 +203,8 @@ const handleAnimelistPage = async () => {
   );
   headerRow.insertBefore(dubHeader, headers[2]);
 
+  // Fetch and cache the dub list only once on initial load
+  cachedDubList = await fetchDubList();
   await addDubStatusToAnimeList(planningList);
 
   let currentLength = planningList.querySelectorAll("div.entry.row").length;
@@ -153,27 +219,22 @@ const handleAnimelistPage = async () => {
   observer.observe(planningList, { childList: true, subtree: true });
 };
 
+// Add dub status column and values to anime list
 const addDubStatusToAnimeList = async (list: HTMLElement) => {
+  if (!cachedDubList) return;
   const items = [...list.querySelectorAll("div.entry.row")];
-  const ids = items
-    .filter((item) => !item.querySelector("div.dub-status"))
-    .map(
-      (item) =>
-        item.children[1]?.children[0]?.getAttribute("href")?.split("/")[2]
-    )
-    .filter(Boolean) as string[];
-
-  if (!ids.length) return;
-
-  const data = await fetchDubStatus(ids);
-  if (!data) return;
-
   for (const item of items) {
     const title = item.children[1];
     const id = title.children[0]?.getAttribute("href")?.split("/")[2];
     if (!id || item.querySelector("div.dub-status")) continue;
 
-    const dub = data.allDubs.find((d) => d.anilistId === parseInt(id)) ?? {
+    const statusSpan = item.querySelector("div.release-status");
+    const isNotReleased = statusSpan?.classList.contains("NOT_YET_RELEASED");
+    if (isNotReleased) continue;
+
+    const dub = cachedDubList.allDubs.find(
+      (d) => d.anilistId === parseInt(id)
+    ) ?? {
       anilistId: parseInt(id),
       hasDub: false,
       isReleasing: false,
@@ -200,7 +261,7 @@ const addDubStatusToAnimeList = async (list: HTMLElement) => {
   }
 };
 
-// Page Change Watcher
+// Track page changes and run appropriate handlers
 let currentPage: string | null = null;
 
 const processPageChange = () => {
@@ -214,7 +275,7 @@ const processPageChange = () => {
   else if (/anime\/.+\/.+/.test(newPage)) handleAnimePage();
 };
 
-// Bootstrapping
+// Bootstrap: wait for page content, then start observing for changes
 (async () => {
   const root = await waitForElement("div.page-content");
   console.log("Anilist page content loaded");
