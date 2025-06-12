@@ -12,6 +12,7 @@ interface DubStatus {
   nextAir: string | null;
 }
 
+//TODO: Get a host for api
 const API_URL = "http://localhost:3000/dubs";
 
 // Utility to wait for a DOM element to appear
