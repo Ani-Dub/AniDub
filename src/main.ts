@@ -65,12 +65,12 @@ const fetchDubList = async (): Promise<ListResponse | null> => {
     alert(
       "Failed to access extension storage. Please reload the page or extension."
     );
-    console.error("chrome.storage.local.get failed:", err);
+    console.warn("chrome.storage.local.get failed:", err);
     return null;
   }
   if (!anilistToken) {
     alert("Anilist token not found in local storage. Please log in again.");
-    console.error("Anilist token not found in local storage");
+    console.warn("Anilist token not found in local storage");
     return null;
   }
 
@@ -83,29 +83,45 @@ const fetchDubList = async (): Promise<ListResponse | null> => {
     });
     if (!res.ok) {
       const err = await res.json();
-      console.error("Failed to fetch dub list:", err.error || res.statusText);
+      console.warn("Failed to fetch dub list:", err.error || res.statusText);
       return null;
     }
     const data: ListResponse = await res.json();
     chrome.storage.local.set({ anilistToken: data.accessToken });
     return data;
   } catch (error) {
-    console.error("Failed to fetch dub list:", error);
+    console.warn("Failed to fetch dub list:", error);
     return null;
   }
 };
 
 // Handle dub status display on anime detail page
 const handleAnimePage = async () => {
-  const id = window.location.pathname.split("/")[2];
+  // Remove any existing Dub Status sidebar entry to prevent duplicates or stale info
   const sidebar = await waitForElement("div.sidebar > div.data");
-  const statusIndex = [...sidebar.children].findIndex(
-    (child) =>
-      child.children.length === 2 && child.children[0].textContent === "Status"
-  );
+  const oldDubStatus = sidebar.querySelector(".airing-countdown");
+  if (oldDubStatus) {
+    oldDubStatus.remove();
+  }
 
-  if (statusIndex === -1) {
-    console.error("Sidebar status index not found");
+  // Wait for the Status row to exist and be in the DOM
+  let statusIndex = -1;
+  let id = "";
+  for (let i = 0; i < 20; i++) {
+    // Try for up to 2 seconds
+    id = window.location.pathname.split("/")[2];
+    statusIndex = [...sidebar.children].findIndex(
+      (child) =>
+        child.children.length === 2 &&
+        child.children[0].textContent === "Status"
+    );
+    if (statusIndex !== -1 && id) break;
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  if (statusIndex === -1 || !id) {
+    console.warn("Sidebar status index not found");
     return;
   }
 
@@ -125,12 +141,12 @@ const handleAnimePage = async () => {
       alert(
         "Failed to access extension storage. Please reload the page or extension."
       );
-      console.error("chrome.storage.local.get failed:", err);
+      console.warn("chrome.storage.local.get failed:", err);
       return;
     }
     if (!anilistToken) {
       alert("Anilist token not found in local storage. Please log in again.");
-      console.error("Anilist token not found in local storage");
+      console.warn("Anilist token not found in local storage");
       return;
     }
     try {
@@ -142,7 +158,7 @@ const handleAnimePage = async () => {
       });
       if (!res.ok) {
         const err = await res.json();
-        console.error(
+        console.warn(
           "Failed to fetch dub status for anime detail page:",
           err.error || res.statusText
         );
@@ -151,7 +167,7 @@ const handleAnimePage = async () => {
       const data: DubStatus = await res.json();
       dub = data;
     } catch (error) {
-      console.error("Failed to fetch dub status for anime detail page:", error);
+      console.warn("Failed to fetch dub status for anime detail page:", error);
       return;
     }
   }
