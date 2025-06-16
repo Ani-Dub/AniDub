@@ -24,6 +24,10 @@
       "matches": ["https://anilist.co/*"],
       "js": ["src/main.js"],
       "css": ["src/public/anime.css", "src/public/animelist.css"]
+    },
+    {
+      "matches": ["http://localhost:3000/oauth2/callback*"],
+      "js": ["src/callback.js"]
     }
   ],
   "host_permissions": [

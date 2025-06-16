@@ -7,7 +7,7 @@ document.getElementById("tokenForm").addEventListener("submit", (event) => {
     return;
   }
 
-  chrome.storage.local.set({ anilistToken: token }, () => {
+  chrome.storage.local.set({ anidub_nonce: token }, () => {
     console.log("Token saved:", token);
     alert("Token saved successfully!");
   });
