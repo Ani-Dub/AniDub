@@ -7,13 +7,13 @@
   "license": "ISC",
   "scripts": {
     "clean": "rimraf dist",
-    "compile": "tsc",
-    "copy": "cpy manifest.json dist && cpy icons/*.png dist/icons && cpy src/public dist",
-    "build": "npm run clean && tsc && npm run copy"
+    "build": "npm run clean && node esbuild.config.js"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.270",
     "cpy-cli": "^5.0.0",
+    "dotenv": "^16.5.0",
+    "esbuild": "0.25.5",
     "rimraf": "^6.0.1",
     "typescript": "^5.6.2"
   }

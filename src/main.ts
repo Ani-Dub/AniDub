@@ -12,8 +12,11 @@ interface DubStatus {
   nextAir: string | null;
 }
 
-//TODO: Get a host for api
-const API_URL = "http://localhost:3000/dubs";
+declare const __ANIDUB_API_URL__: string;
+
+// The API_URL will be replaced at build time
+const API_URL = __ANIDUB_API_URL__ + "/dubs";
+
 let cachedDubList: ListResponse | null = null;
 let currentPage: string | null = null;
 

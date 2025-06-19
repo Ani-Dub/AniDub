@@ -26,13 +26,12 @@
       "css": ["src/public/anime.css", "src/public/animelist.css"]
     },
     {
-      "matches": ["http://localhost:3000/oauth2/callback*"],
+      "matches": ["__ANIDUB_API_URL__/oauth2/callback*"],
       "js": ["src/callback.js"]
     }
   ],
   "host_permissions": [
-    "https://anidub.diskstation.local/*",
-    "http://localhost:3000/*"
+    "__ANIDUB_API_URL__/*"
   ],
   "web_accessible_resources": [
     {
