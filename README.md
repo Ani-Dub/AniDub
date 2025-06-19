@@ -28,11 +28,14 @@ AniDub is a Chrome extension that enhances the AniList anime website by displayi
    ```sh
    npm install
    ```
-3. **Build the extension:**
+3. **Add environment variables:**
+   - Create `.env` file from `.env.sample`
+   - Replace placeholders with desired values
+4. **Build the extension:**
    ```sh
    npm run build
    ```
-4. **Load the extension in Chrome:**
+5. **Load the extension in Chrome:**
    - Go to `chrome://extensions/`
    - Enable "Developer mode"
    - Click "Load unpacked" and select the `src/public` directory
@@ -55,7 +58,6 @@ AniDub is a Chrome extension that enhances the AniList anime website by displayi
 
 - The extension uses polling and mutation observers to handle dynamic page changes on AniList.
 - Dub status is inserted only after the relevant DOM elements are available to avoid layout issues.
-- The API URL is currently set to `http://localhost:3000/dubs` (see `API_URL` in `main.ts`). Update this to your deployed API host as needed.
 
 ## License
 
