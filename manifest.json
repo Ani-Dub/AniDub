@@ -18,7 +18,6 @@
     }
   },
   "permissions": ["storage"],
-  "background": {},
   "content_scripts": [
     {
       "matches": ["https://anilist.co/*"],
@@ -30,13 +29,16 @@
       "js": ["src/callback.js"]
     }
   ],
-  "host_permissions": [
-    "__ANIDUB_API_URL__/*"
-  ],
+  "host_permissions": ["__ANIDUB_API_URL__/*"],
   "web_accessible_resources": [
     {
       "resources": ["icons/*.png", "src/public/*"],
       "matches": ["https://anilist.co/*"]
     }
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "anidub@jonesbryan.com"
+    }
+  }
 }

@@ -7,7 +7,8 @@
   "license": "ISC",
   "scripts": {
     "clean": "rimraf dist",
-    "build": "npm run clean && node esbuild.config.js"
+    "build": "npm run clean && node esbuild.config.js",
+    "zip": "tar -a -c -f dist/anidub-firefox.zip -C dist ."
   },
   "devDependencies": {
     "@types/chrome": "^0.0.270",
