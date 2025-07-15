@@ -247,7 +247,7 @@ const addDubStatusToAnimeList = async (list: HTMLElement) => {
 
     const statusEl = createElementWithClasses("div", ["dub-status"]);
     if (!dub.hasDub) {
-      statusEl.textContent = "No Dub";
+      statusEl.textContent = "";
       statusEl.classList.add("no-dub");
     } else if (dub.isReleasing && dub.nextAir) {
       statusEl.textContent = `Ep ${
