@@ -265,38 +265,6 @@ const addDubStatusToAnimeList = async (list: HTMLElement) => {
 
 const addSequelStatusToCompletedList = async (list: HTMLElement) => {
   const items = list.querySelectorAll("div.entry.row");
-  const completedIds = new Set<string>();
-  const planningIds = new Set<string>();
-
-  for (const item of items) {
-    const id = item.children[1].children[0]
-      ?.getAttribute("href")
-      ?.split("/")[2];
-    if (id) completedIds.add(id);
-  }
-
-  // Build planningIds from ListResponse using the planning list found in the DOM
-  const listContainer = list.parentElement;
-  let planningList: HTMLElement | undefined;
-  if (listContainer) {
-    planningList = [...listContainer.children].find(
-      (l) => l.children[0]?.textContent === "Planning"
-    ) as HTMLElement;
-  }
-  if (planningList && cachedDubList?.allDubs) {
-    const planningItems = planningList.querySelectorAll("div.entry.row");
-    for (const item of planningItems) {
-      const id = item.children[1].children[0]
-        ?.getAttribute("href")
-        ?.split("/")[2];
-      if (
-        id &&
-        cachedDubList.allDubs.find((d) => d.anilistId.toString() === id)
-      ) {
-        planningIds.add(id);
-      }
-    }
-  }
 
   for (const item of items) {
     const title = item.children[1];
@@ -309,9 +277,10 @@ const addSequelStatusToCompletedList = async (list: HTMLElement) => {
     if (dub?.Sequels?.length) {
       const missingSequels = dub.Sequels.filter(
         (seq) =>
-          !completedIds.has(seq.sequelId.toString()) &&
-          !planningIds.has(seq.sequelId.toString())
+          cachedDubList?.allDubs.find((d) => d.anilistId === seq.sequelId) ===
+          undefined
       );
+
       if (missingSequels.length > 0) {
         statusEl.textContent = "Sequel Available";
         statusEl.classList.add("sequel-available");
