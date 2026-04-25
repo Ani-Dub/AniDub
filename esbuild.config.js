@@ -30,7 +30,7 @@ for (const k in env) {
 
 esbuild
   .build({
-    entryPoints: ["src/main.ts", "src/callback.ts"],
+    entryPoints: ["src/main.ts", "src/callback.ts", "src/background.ts"],
     bundle: false,
     outdir: "dist/src",
     define,

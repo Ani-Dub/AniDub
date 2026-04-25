@@ -52,7 +52,7 @@ const formatDateCountdown = (date: Date): string => {
 const createElementWithClasses = (
   tag: string,
   classes: string[],
-  text?: string
+  text?: string,
 ): HTMLElement => {
   const el = document.createElement(tag);
   el.classList.add(...classes);
@@ -66,7 +66,7 @@ const getAuthToken = async (): Promise<string | null> => {
     return result.anidub_nonce ?? null;
   } catch (err) {
     alert(
-      "Failed to access localStorage. Please reload the page or extension."
+      "Failed to access localStorage. Please reload the page or extension.",
     );
     console.warn("Error getting auth token:", err);
     return null;
@@ -85,18 +85,16 @@ const fetchDubList = async (): Promise<ListResponse | null> => {
   }
 
   try {
-    const res = await fetch(`${API_URL}/list`, {
-      headers: { Authorization: token },
+    const response = await chrome.runtime.sendMessage({
+      type: "FETCH_DUB_LIST",
     });
-    if (!res.ok) {
-      console.warn(
-        "Failed to fetch dub list:",
-        (await res.json()).error || res.statusText
-      );
+
+    if ("error" in response) {
+      console.warn("Failed to fetch dub list:", response.error);
       return null;
     }
 
-    const data: ListResponse = await res.json();
+    const data = response as ListResponse;
     chrome.storage.local.set({ anilistToken: data.accessToken });
     return data;
   } catch (err) {
@@ -110,17 +108,17 @@ const fetchDubStatusById = async (id: string): Promise<DubStatus | null> => {
   if (!token) return null;
 
   try {
-    const res = await fetch(`${API_URL}/${id}`, {
-      headers: { Authorization: token },
+    const response = await chrome.runtime.sendMessage({
+      type: "FETCH_DUB_STATUS",
+      payload: { id },
     });
-    if (!res.ok) {
-      console.warn(
-        "Failed to fetch dub status:",
-        (await res.json()).error || res.statusText
-      );
+
+    if ("error" in response) {
+      console.warn("Failed to fetch dub status:", response.error);
       return null;
     }
-    return await res.json();
+
+    return response as DubStatus;
   } catch (err) {
     console.warn("Error fetching dub status:", err);
     return null;
@@ -138,7 +136,7 @@ const handleAnimePage = async () => {
   const id = window.location.pathname.split("/")[2];
   const statusIndex = [...sidebar.children].findIndex(
     (child) =>
-      child.children.length === 2 && child.children[0].textContent === "Status"
+      child.children.length === 2 && child.children[0].textContent === "Status",
   );
 
   if (!id || statusIndex === -1) return;
@@ -157,13 +155,13 @@ const handleAnimePage = async () => {
   const value = createElementWithClasses("div", ["value"]);
 
   [wrapper, label, value].forEach((el) =>
-    el.setAttribute(dataAttr.name, dataAttr.value)
+    el.setAttribute(dataAttr.name, dataAttr.value),
   );
 
   if (!dub.hasDub) value.textContent = "Not available";
   else if (dub.isReleasing && dub.nextAir) {
     value.textContent = `Ep ${dub.dubbedEpisodes + 1}: ${formatDateCountdown(
-      new Date(dub.nextAir)
+      new Date(dub.nextAir),
     )}`;
   } else {
     value.textContent = "Finished";
@@ -178,7 +176,7 @@ const handleAnimelistPage = async () => {
 
   const findListByTitle = (title: string) =>
     [...listContainer.children].find(
-      (list) => list.children[0].textContent === title
+      (list) => list.children[0].textContent === title,
     ) as HTMLElement;
 
   const planningList = findListByTitle("Planning");
@@ -208,7 +206,7 @@ const insertHeader = (list: HTMLElement, className: string, label: string) => {
 
 const observeListChanges = (
   list: HTMLElement,
-  callback: (list: HTMLElement) => Promise<void>
+  callback: (list: HTMLElement) => Promise<void>,
 ) => {
   let currentLength = list.querySelectorAll("div.entry.row").length;
   const observer = new MutationObserver(async () => {
@@ -278,7 +276,7 @@ const addSequelStatusToCompletedList = async (list: HTMLElement) => {
       const missingSequels = dub.Sequels.filter(
         (seq) =>
           cachedDubList?.allDubs.find((d) => d.anilistId === seq.sequelId) ===
-          undefined
+          undefined,
       );
 
       if (missingSequels.length > 0) {
